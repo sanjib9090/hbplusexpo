@@ -1,5 +1,5 @@
-const ALLOWED_DOMAINS = ['hbplus.fit', 'outlook.com'];
-const DENIED_MESSAGE = 'Access restricted. Use a Google account with an @hbplus.fit or @outlook.com email address.';
+const ALLOWED_DOMAINS = ['hbplus.fit'];
+const DENIED_MESSAGE = 'Access restricted. Use a Google account with an @hbplus.fit email address.';
 function isAllowedEmail(email) {
   if (typeof email !== 'string') return false;
   const parts = email.trim().toLowerCase().split('@');

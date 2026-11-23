@@ -2,7 +2,7 @@
 
 HB+ Glass is an Expo app for Android, iOS and web. It uses Google Sign-In and Supabase Auth, then saves profile details in the Supabase Postgres `public.profiles` table. It is **not** a Supabase Storage bucket implementation.
 
-This guide describes the supplied project. Dashboard and cloud changes must be made by a project administrator; running the app alone does not configure Google or Supabase. Live Google sign-in, database policies and native builds have not been verified as part of this project update.
+This guide targets **only `@hbplus.fit` Google accounts**. The supplied project may still allow `@outlook.com`: the source code and live Supabase configuration must be changed as described in section 8. Editing this README alone does not enforce the restriction. Dashboard and cloud changes must be made by a project administrator; running the app alone does not configure Google or Supabase. Live Google sign-in, database policies and native builds have not been verified.
 
 ## 1. Prerequisites
 
@@ -94,7 +94,7 @@ Select the relevant build profile and inspect the Android keystore. For Play-dis
 
 ### 4.2 Create the profile table and policies
 
-Open the Supabase project's **SQL Editor**, open the included `supabase/profiles.sql` file locally, paste its entire contents into the editor and run it. It creates `public.profiles` when absent, adds missing fields to an existing table, enables row-level security (RLS), grants access, installs three named policies and creates an `updated_at` trigger. SQL Editor operations affect the selected live project:verify the project before running them.
+First update all four domain regex occurrences in `supabase/profiles.sql` to the `hbplus.fit`-only expression in section 8; otherwise running the supplied file may allow Outlook profile access. Then open the Supabase project's **SQL Editor**, open the updated file locally, paste its entire contents into the editor and run it. It creates `public.profiles` when absent, adds missing fields to an existing table, enables row-level security (RLS), grants access, installs three named policies and creates an `updated_at` trigger. SQL Editor operations affect the selected live project:verify the project before running them.
 
 **Existing table warning:** `CREATE TABLE IF NOT EXISTS` does not repair an incompatible existing table. Inspect its column types, constraints, grants, triggers and all policies first. This app expects:
 
@@ -200,41 +200,33 @@ npx eas-cli build --platform ios --profile preview
 
 Supabase Auth stores the authentication account; `profiles` stores user-entered fields and a copy of the account email. That profile email can be changed by a client with access and may be stale until a profile is saved. Do not use it as identity proof; use trusted authentication claims/server-side verification.
 
-## 8. How domain restriction works
+## 8. Restrict access to `@hbplus.fit` only
 
-### Current allowed domains
+Only Google Accounts with an email at the exact `hbplus.fit` domain should be allowed. Domain matching should be case-insensitive; `user@outlook.com`, `user@gmail.com`, `user@sub.hbplus.fit` and `user@hbplus.fit.example.com` must be rejected. The existing client check also requires the Google Workspace `hd` claim to be `hbplus.fit`. Email suffix alone does not prove current Workspace membership.
 
-- `@hbplus.fit`
-- `@outlook.com`
+**The steps below change the app and profile access; editing this README does not.** Client-side checks are bypassable. Profile RLS protects `public.profiles` only; it does not prevent Supabase Auth from creating or issuing sessions to other users, or protect other tables, APIs or storage.
 
-The email must belong to a **Google Account**. An Outlook address needs to be linked to Google; this app does not offer Microsoft sign-in. The domain is matched exactly, case-insensitively; `@example.hbplus.fit` is not the same as `@hbplus.fit`.
+### 8.1 Update the app
 
-There are **two separate checks**:
-
-1. **App check:** `src/auth/policy.cjs` defines `ALLOWED_DOMAINS`. `src/auth/claims.cjs` checks decoded Google claims before the Supabase exchange. This is bypassable and is not an authorization boundary. The special `hbplus.fit` `hd` requirement lives in `claims.cjs` and is also client-side only.
-2. **Supabase profile access:** the three RLS policies in `supabase/profiles.sql` check `auth.uid()`, the Supabase JWT Google provider and its email domain for reads, inserts and updates. SQL checks protect **profile rows**, not the entire Supabase Auth signup endpoint or any other tables, APIs or storage. RLS does not enforce the `hd` claim or verify current Workspace membership.
-
-Google's `email_verified` for a third-party Outlook address does not guarantee continuing ownership of that mailbox. If Workspace membership or ongoing ownership is a security requirement, implement and maintain a trusted server-side verification/membership policy appropriate to your organization. Review all Supabase policies: permissive policies combine with OR, so an unrelated broad policy can defeat intended restrictions.
-
-### Add another domain: example `example.com`
-
-Replace `example.com` everywhere below with your actual domain. Do not treat this example as a request to allow it automatically.
-
-1. In `src/auth/policy.cjs`:
+1. In `src/auth/policy.cjs`, change the existing allowed-domain list to:
 
 ```js
-const ALLOWED_DOMAINS = ['hbplus.fit', 'outlook.com', 'example.com'];
+const ALLOWED_DOMAINS = ['hbplus.fit'];
 ```
 
-2. Update the visible allowed-domain caption in `src/screens/Login.js`, and update `test/domain.test.cjs` with accepted and deceptive-domain cases. If a domain needs a Workspace membership requirement, do not assume email suffix alone proves membership; the special `hd` handling currently applies only to `hbplus.fit` and only on the client.
-3. Edit **all four** regex occurrences in `supabase/profiles.sql` to use the new list. This prevents a future run of that file from reverting the change:
+2. Keep the `hbplus.fit` Workspace `hd` check in `src/auth/claims.cjs`. Update the visible allowed-domain caption in `src/screens/Login.js` to show only `@hbplus.fit`.
+3. Update `test/domain.test.cjs` and other affected tests. Cover a valid `@hbplus.fit` account, case variants, Outlook and Gmail, subdomains, deceptive suffixes, unverified email and a missing or incorrect `hd` claim. Run `npm test`.
+4. Rebuild and redeploy the web app and rebuild/reinstall native apps. Old clients may retain the previous client-side allowlist.
+
+### 8.2 Restrict Supabase profile access
+
+In `supabase/profiles.sql`, replace **all four** domain regex occurrences with this expression before applying the file:
 
 ```text
-^[^@[:space:]]+@(hbplus[.]fit|outlook[.]com|example[.]com)$
+^[^@[:space:]]+@hbplus[.]fit$
 ```
 
-Use `[.]` for literal dots. Review escaping for any other allowed domain rather than inserting arbitrary regex metacharacters.
-4. Apply matching changes to the **live** Supabase policies. If the three supplied policies exist with these names and you intend to replace their conditions, run the following in the correct project's SQL Editor:
+Update the live Supabase policies too; changing the local SQL file alone does not update existing policies. If the three supplied policies exist with these names and replacing their conditions is appropriate, run the following in the correct project's SQL Editor:
 
 ```sql
 alter policy "read own profile" on public.profiles
@@ -242,7 +234,7 @@ using (
   id = auth.uid()
   and auth.jwt()->'app_metadata'->>'provider' = 'google'
   and coalesce(auth.jwt()->>'email', '') ~*
-    '^[^@[:space:]]+@(hbplus[.]fit|outlook[.]com|example[.]com)$'
+    '^[^@[:space:]]+@hbplus[.]fit$'
 );
 
 alter policy "insert own profile" on public.profiles
@@ -250,7 +242,7 @@ with check (
   id = auth.uid()
   and auth.jwt()->'app_metadata'->>'provider' = 'google'
   and coalesce(auth.jwt()->>'email', '') ~*
-    '^[^@[:space:]]+@(hbplus[.]fit|outlook[.]com|example[.]com)$'
+    '^[^@[:space:]]+@hbplus[.]fit$'
 );
 
 alter policy "update own profile" on public.profiles
@@ -258,20 +250,23 @@ using (
   id = auth.uid()
   and auth.jwt()->'app_metadata'->>'provider' = 'google'
   and coalesce(auth.jwt()->>'email', '') ~*
-    '^[^@[:space:]]+@(hbplus[.]fit|outlook[.]com|example[.]com)$'
+    '^[^@[:space:]]+@hbplus[.]fit$'
 )
 with check (
   id = auth.uid()
   and auth.jwt()->'app_metadata'->>'provider' = 'google'
   and coalesce(auth.jwt()->>'email', '') ~*
-    '^[^@[:space:]]+@(hbplus[.]fit|outlook[.]com|example[.]com)$'
+    '^[^@[:space:]]+@hbplus[.]fit$'
 );
 ```
 
-If those policies don't exist or have been customized, inspect the existing schema and policies instead of assuming the example applies. Preserve any extra restrictions you need. Check all other policies too.
-5. Run `npm test`, rebuild and redeploy the web app or rebuild/reinstall the native app. Test a user from each allowed domain, a disallowed user, anonymous access, and an allowed user's attempt to access **another user's** profile. Confirm that only the owner has access. Consider sign-out/sign-in to obtain refreshed claims after account changes.
+If the policies are absent or customized, inspect the schema and adapt the changes rather than assuming the example applies; preserve any additional restrictions. Review **all** policies and grants: permissive policies combine with OR, so another broad policy can grant access. Apply equivalent server-side restrictions to every other protected table, API and storage resource. Do not authorize using the editable `profiles.email` copy.
 
-Changing JavaScript alone will not update Supabase's existing RLS policies, so a newly allowed domain can still fail to read/save its profile. Removing the SQL domain check while relying only on JavaScript means an authenticated client can bypass the app's domain filter and call the Data API directly. Owner-only RLS should remain in either design.
+### 8.3 Enforce the sign-in boundary
+
+For an actual `hbplus.fit`-only authentication boundary, configure a trusted server-side admission control for Supabase Auth, such as a Before User Created hook, and verify it rejects non-`hbplus.fit` identities. Confirm its behavior for each enabled provider and sign-in method; disable or separately restrict methods that could bypass the intended check. A signup hook alone may not block sign-in by existing accounts or revoke existing sessions. Review existing non-`hbplus.fit` users and sessions and revoke or remove access as appropriate; enforce the domain on every protected resource as well. If Google Workspace membership or ongoing mailbox ownership is required, implement and maintain trusted server-side verification appropriate to the organization; the client `hd` check and these RLS expressions do not establish it.
+
+After applying changes, test an allowed Workspace user, disallowed users (including an existing account), anonymous access, and an allowed user's attempt to access another user's profile. Confirm the expected Auth and resource-access behavior, including after token refresh. Verify in a safe test environment before rolling out to production.
 
 ## 9. Troubleshooting
 

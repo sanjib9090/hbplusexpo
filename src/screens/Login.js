@@ -28,7 +28,7 @@ export default function Login() {
        {!configured && <Text accessibilityRole="alert" style={styles.error}>Add your Google and Supabase configuration in .env and rebuild the app.</Text>}
        {!!error && <View style={styles.errorBox}><Text accessibilityRole="alert" style={styles.errorText}>{error}</Text><Pressable accessibilityRole="button" accessibilityLabel="Dismiss message" onPress={clearError} hitSlop={8} style={styles.dismiss}><Text style={styles.dismissText}>✕</Text></Pressable></View>}
        <View style={[styles.divider, compact && styles.dividerCompact]}/>
-       <Text style={styles.caption}>For Google accounts using <Text style={styles.emphasis}>@hbplus.fit</Text> or <Text style={styles.emphasis}>@outlook.com</Text>.</Text>
+       <Text style={styles.caption}>For Google accounts using <Text style={styles.emphasis}>@hbplus.fit</Text>  <Text style={styles.emphasis}></Text>.</Text>
      </Glass>
    </View>
    {!short && <View style={[styles.footer,compact && styles.footerCompact,wide && styles.footerWide]}><Text style={styles.footerMain}>BODY  ·  MIND  ·  GUT</Text><Text style={styles.footerNote}>Your space, made personal</Text></View>}
