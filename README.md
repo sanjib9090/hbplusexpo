@@ -1,8 +1,14 @@
 :# HB+ Glass : setup and authentication guide
 
-HB+ Glass is an Expo app for Android, iOS and web. It uses Google Sign-In and Supabase Auth, then saves profile details in the Supabase Postgres `public.profiles` table. It is **not** a Supabase Storage bucket implementation.
+# HB+ Glass
 
-This guide targets **only `@hbplus.fit` Google accounts**. The supplied project may still allow `@outlook.com`: the source code and live Supabase configuration must be changed as described in section 8. Editing this README alone does not enforce the restriction. Dashboard and cloud changes must be made by a project administrator; running the app alone does not configure Google or Supabase. Live Google sign-in, database policies and native builds have not been verified.
+A cross-platform application built with Expo and React Native. It uses Google Sign-In and Supabase Auth to provide domain-restricted access to a protected dashboard on Android, iOS, and the web.
+
+## Links
+
+- **Live web app:** [hbplusexpo.netlify.app](https://hbplusexpo.netlify.app/)
+- **Android APK:** [Open the Expo build page](https://expo.dev/accounts/sanjib_9090/projects/hbplus-glass/builds/456911b4-9890-413f-ad70-6fd8fbdb809b) and select the install button allow unkknown resourses and install on your phone.
+- **GitHub repository:** [github.com/sanjib9090/hbplusexpo](https://github.com/sanjib9090/hbplusexpo)
 
 ## 1. Prerequisites
 
